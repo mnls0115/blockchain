@@ -87,14 +87,20 @@ class Tx:
         h256 = hash256(s)
         return int.from_bytes(h256,'big')
 
-    def sign_input(self, input_index, private_key, secript_pubkey):
+    def sign_input(self, input_index, private_key, script_pubkey):
         z = self.sing_hash(input_index = input_index,
-                           script_pubkey = secript_pubkey)
+                           script_pubkey = script_pubkey)
         der = private_key.sign(z).der()
         sig = der + SIGHASH_ALL.to_bytes(1,'big')
         sec = private_key.point.sec()
         self.tx_ins[input_index].script_sig = Script([sig, sec])
 
+    def verify_input(self, input_index, script_pubkey):
+        tx_in = self.tx_ins[input_index]
+        z = self.sing_hash(input_index = input_index,
+                           script_pubkey = script_pubkey)
+        combined = tx_in.script_sig + script_pubkey
+        return combined.evaluate(z)
 
     def is_coinbase(self):
         """
@@ -117,17 +123,30 @@ class Tx:
 
     def to_dict(self):
         """
-        Convert coinbase transaction
+        Convert transaction
         # convert prev_tx hash in gex from bytes
         # convert BlockHeight in hex which is stored in Script signiture
         """
 
-        if self.is_coinbase:
-            self.tx_ins[0].prev_tx = self.tx_ins[0].prev_tx.hex()
-            self.tx_ins[0].script_sig.cmds[0] = little_endian_to_int(self.tx_ins[0].script_sig.cmds[0])
-            self.tx_ins[0].script_sig = self.tx_ins[0].script_sig.__dict__
-        
-        self.tx_ins[0] = self.tx_ins[0].__dict__
+        for tx_index, tx_in in enumerate(self.tx_ins):
+            if self.is_coinbase():
+                tx_in.script_sig.cmds[0] = little_endian_to_int(tx_in.script_sig.cmds[0])
+
+            tx_in.prev_tx = tx_in.prev_tx.hex()
+
+            for index, cmd in enumerate(tx_in.script_sig.cmds):
+                if isinstance(cmd, bytes):
+                    tx_in.script_sig.cmds[index] = cmd.hex()
+            
+            tx_in.script_sig = tx_in.script_sig.__dict__
+            self.tx_ins[tx_index] = tx_in.__dict__
+
+        """ Coinbase 때는 쓰였으나, 이후 transaction 추가하며 제거됨 (3.29) """
+        # if self.is_coinbase:
+        #     self.tx_ins[0].prev_tx = self.tx_ins[0].prev_tx.hex()
+        #     self.tx_ins[0].script_sig.cmds[0] = little_endian_to_int(self.tx_ins[0].script_sig.cmds[0])
+        #     self.tx_ins[0].script_sig = self.tx_ins[0].script_sig.__dict__
+        # self.tx_ins[0] = self.tx_ins[0].__dict__
 
         """
         Convert Transaction Output to dict
@@ -135,9 +154,16 @@ class Tx:
         # If values is in bytes, convert it to hex
         # Loop through all the TxOut Objects and convert them into dict
         """
-        self.tx_outs[0].script_pubkey.cmds[2] = self.tx_outs[0].script_pubkey.cmds[2].hex()
-        self.tx_outs[0].script_pubkey = self.tx_outs[0].script_pubkey.__dict__
-        self.tx_outs[0] = self.tx_outs[0].__dict__
+        
+        for index, tx_out in enumerate(self.tx_outs):
+            tx_out.script_pubkey.cmds[2] = tx_out.script_pubkey.cmds[2].hex()
+            tx_out.script_pubkey = tx_out.script_pubkey.__dict__
+            self.tx_outs[index] = tx_out.__dict__
+
+        """ Coinbase 때는 쓰였으나, 이후 transaction 추가하며 제거됨 (3.29) """
+        # self.tx_outs[0].script_pubkey.cmds[2] = self.tx_outs[0].script_pubkey.cmds[2].hex()
+        # self.tx_outs[0].script_pubkey = self.tx_outs[0].script_pubkey.__dict__
+        # self.tx_outs[0] = self.tx_outs[0].__dict__
 
         return self.__dict__
 

@@ -52,3 +52,35 @@ def endcode_variant(i):
         return b'\xff' + int_to_little_endian(i,8)
     else:
         return ValueError(f'Integer too large {i}')
+    
+def merkle_parent_level(hashes):
+    """ Takes a list of binary hashes and returns a list thats half of the length"""
+    if len(hashes) % 2 == 1:
+        hashes.append(hashes[-1])
+    parent_level = []
+
+    for i in range(0,len(hashes), 2):
+        parent = hash256(hashes[i] + hashes[i+1])
+        parent_level.append(parent)
+    return parent_level
+
+def merkle_root(hashes):
+    """ Takes a list of binary hashes and returns the merkle root"""
+    current_level = hashes
+    while len(current_level) > 1:
+        current_level = merkle_parent_level(current_level)
+    
+    return current_level[0]
+
+def target_to_bits(target):
+    """ Turns a target integer back into bits """
+    raw_bytes = target.to_bytes(32, 'big')
+    raw_bytes = raw_bytes.lstrip(b'\x00')
+    if raw_bytes[0] > 0x7f:
+        exponent = len(raw_bytes) + 1
+        coefficient = b'\x00' + raw_bytes[:2]
+    else:
+        exponent = len(raw_bytes)
+        coefficient = raw_bytes[:3]
+    new_bits = coefficient[::-1] + bytes([exponent])
+    return new_bits

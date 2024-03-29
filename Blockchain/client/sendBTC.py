@@ -47,9 +47,9 @@ class SendBTC:
                 TxObj = newutxos[Txbyte]
             
                 for index, txout in enumerate(TxObj.tx_outs):
-                    if txout.script_pubket.cmds[2] == self.fromPubKeyHAsh:
+                    if txout.script_pubkey.cmds[2] == self.fromPubKeyHAsh:
                         self.Total += txout.amount
-                        prev_tx = bytes.fromhex(TxObj.id())
+                        prev_tx = bytes.fromhex(Txbyte)
                         TxIns.append(TxIn(prev_tx, index))
             else:
                 break
@@ -81,7 +81,7 @@ class SendBTC:
         for index, input in enumerate(self.TxIns):
             self.TxObj.sign_input(input_index = index,
                                   private_key = priv,
-                                  secript_pubkey = self.From_address_script_pubkey)
+                                  script_pubkey = self.From_address_script_pubkey)
         
         return True
 
@@ -95,7 +95,8 @@ class SendBTC:
                             tx_ins = self.TxIns,
                             tx_outs = self.TxOuts,
                             locktime = 0)
+            self.TxObj.TxId = self.TxObj.id()
             self.signTx()
-            return True
+            return self.TxObj
         
         return False
