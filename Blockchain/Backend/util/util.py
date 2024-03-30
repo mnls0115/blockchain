@@ -25,6 +25,22 @@ def little_endian_to_int(b):
     """takes byte sequence and returns an integer"""
     return int.from_bytes(b, 'little')
 
+def encode_base58(s):
+    # deretmine how many 0 bytes (b'\x00') s starts with
+    count = 0
+    for c in s:
+        if c == 0:
+            count += 1
+        else:
+            break
+    num = int.from_bytes(s,'big')
+    prefix = '1' * count
+    result = ''
+    while num > 0:
+        num, mod = divmod(num, 58)
+        result = BASE58_ALPHABET[mod] + result
+    return prefix + result
+
 def decode_base58(s):
     num = 0
 
