@@ -2,13 +2,15 @@ import sys
 sys.path.append('/Users/user/Dropbox/2024Projects/Blockchain')
 # sys.path.append('/Users/mnls0/Dropbox/2024Projects/Blockchain')
 
+import configparser
 from Blockchain.Backend.core.block import Block
 from Blockchain.Backend.core.blockheader import BlockHeader
 from Blockchain.Backend.util.util import hash256, merkle_root, target_to_bits
-from Blockchain.Backend.core.database.database import BlockchainDB
+from Blockchain.Backend.core.database.database import BlockchainDB, NodeDB
 from Blockchain.Backend.core.Tx import CoinbaseTx
 from multiprocessing import Process, Manager
 from Blockchain.Frontend.run import main
+from Blockchain.Backend.core.network.syncManager import syncManager
 import time
 
 Zero_HASH = '0' * 64
@@ -35,6 +37,16 @@ class Blockchain:
         prevBlockHash = Zero_HASH
         self.addBlock(BlockHeight = BlockHeight,
                       prevBlockHash = prevBlockHash)
+        
+    """ Start the Sync Node """
+    def startSync(self):
+        node = NodeDB()
+        portList = node.read()
+
+        for port in portList:
+            if localHostPort != port:
+                sync = syncManager(localHost, port)
+                sync.startDownload(port)
 
     """ Keep track of all the unspent Transaction in cache memory for fast retrival"""
     def store_utxos_in_cache(self):
@@ -115,7 +127,8 @@ class Blockchain:
                                   prevBlockHash = prevBlockHash,
                                   merkleRoot = merkleRoot,
                                   timestamp = timestamp,
-                                  bits = self.bits)
+                                  bits = self.bits,
+                                  nonce = 0)
         blockHeader.mine(self.current_target)
 
         self.remove_spent_Transaction()
@@ -126,7 +139,7 @@ class Blockchain:
         self.write_on_disk([Block(BlockHeight = BlockHeight,
                                 Blocksize = self.Blocksize,
                                 BlockHeader = blockHeader.__dict__,
-                                TxCount = 1,
+                                TxCount = len(self.TxJson),
                                 Txs = self.TxJson).__dict__])
 
     def main(self):
@@ -142,12 +155,25 @@ class Blockchain:
                           prevBlockHash = prevBlockHash)
 
 if __name__ == "__main__":
+    """ Read configuration file"""
+    config = configparser.ConfigParser()
+    config.read('config.ini')
+    localHost = config['DEFAULT']['host']
+    localHostPort = int(config['MINER']['port'])
+    webport = int(config['webhost']['port'])
+
     with Manager() as manager:
         utxos = manager.dict()
         MemPool = manager.dict()
 
-        webapp = Process(target = main, args = (utxos, MemPool))
+        webapp = Process(target = main, args = (utxos, MemPool, webport))
         webapp.start()
 
+        """ Start server and Listen for miner requests """
+        sync = syncManager(localHost, localHostPort)
+        startServer = Process(target = sync.spinUpTheServer)
+        startServer.start()
+
         blockchain = Blockchain(utxos, MemPool)
+        blockchain.startSync()
         blockchain.main()

@@ -1,4 +1,4 @@
-from Blockchain.Backend.util.util import int_to_little_endian, endcode_variant
+from Blockchain.Backend.util.util import little_endian_to_int, int_to_little_endian, endcode_variant, read_variant
 from Blockchain.Backend.core.EllepticCurve.op import OP_CODE_FUNCTION
 
 class Script:
@@ -39,6 +39,38 @@ class Script:
         total = len(result)
         # encode variant the total length of the result and prepend
         return endcode_variant(total) + result
+
+    @classmethod
+    def parse(cls, s):
+        # get the length of the entire field
+        length = read_variant(s)
+        # initialize the cmds array
+        cmds = []
+        # initialize the number of bytes we`ve read to 0
+        count = 0
+        # loop until we`ve read length bytes
+        while count < length:
+            current = s.read(1)
+            count += 1
+            current_byte = current[0]
+            if current_byte >= 1 and current_byte <= 75:
+                n = current_byte
+                cmds.append(s.read(n))
+                count += n
+            elif current_byte == 76:
+                data_length = little_endian_to_int(s.read(1))
+                cmds.append(s.read(data_length))
+                count += data_length +1
+            elif current_byte == 77:
+                data_length = little_endian_to_int(s.read(2))
+                cmds.append(s.read(data_length))
+                count += data_length + 2
+            else:
+                op_code = current_byte
+                cmds.append(op_code)
+        if count != length:
+            raise SyntaxError ('parsing script failed')
+        return cls(cmds)
     
     def evaluate(self, z):
         cmds = self.cmds[:]

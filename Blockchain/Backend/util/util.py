@@ -56,6 +56,23 @@ def decode_base58(s):
     
     return combined[1:-4]
 
+def read_variant(s):
+    """ read_variant reads a variable integer from a stream """
+    i = s.read(1)[0]
+    if i == 0xfd:
+        # 0xfd means the next two bytes are the number
+        return little_endian_to_int(s.read(2))
+    elif i == 0xfe:
+        # 0xfe means the next four bytes are the number
+        return little_endian_to_int(s.read(4))
+    elif i == 0xff:
+        # 0xff means the next eight bytes are the number
+        return little_endian_to_int(s.read(8))
+    else:
+        # anything else is just the integer
+        return i
+
+
 def endcode_variant(i):
     """ Encodes an integer as an variant """
     if i < 0xfd:

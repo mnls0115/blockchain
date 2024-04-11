@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %} UTXO {% endblock %}
+{% block content %}
+<div class="grid-container1">
+    <h1> Unspent Transactions (UTXO) </h1>
+    <div class="blockheader">
+        <div class="bheader"> Transaction ID </div>
+    </div>
+
+    {% for Tx in allTransactions %}
+    <a if="detail" href="{{ url_for('transactions', txid=Tx) }}">
+        <div class = "block">
+            <div class="block-item TxId"> {{ Tx }}</div>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+{% endblock %}
