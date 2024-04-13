@@ -1,5 +1,9 @@
 from io import BytesIO
-from Blockchain.Backend.util.util import (int_to_little_endian, little_endian_to_int, hash256, endcode_variant)
+from Blockchain.Backend.util.util import (int_to_little_endian,
+                                          little_endian_to_int,
+                                          hash256,
+                                          endcode_variant,
+                                          read_variant)
 
 NETWORK_MAGIC = b'\xf9\xbe\x64\xd9'
 FINISHED_SENDING = b'\x0a\x11\x09\x07'
@@ -62,6 +66,30 @@ class requestBlock:
     def serialize(self):
         result = self.startBlcok
         result += self.endBlock
+        return result
+    
+class portlist:
+    command = b'portlist'
+    def __init__(self, ports = None):
+        self.ports = ports
+    
+    @classmethod
+    def parse(cls, s):
+        ports = []
+        length = read_variant(s)
+
+        for _ in range(length):
+            port = little_endian_to_int(s.read(4))
+            ports.append(port)
+        
+        return ports
+    
+    def serialize(self):
+        result = endcode_variant(len(self.ports))
+
+        for port in self.ports:
+            result += int_to_little_endian(port, 4)
+        
         return result
     
 class FinishedSending:

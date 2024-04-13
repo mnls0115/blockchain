@@ -1,4 +1,8 @@
-from Blockchain.Backend.util.util import hash256, little_endian_to_int, int_to_little_endian
+from Blockchain.Backend.util.util import (hash256,
+                                          little_endian_to_int,
+                                          int_to_little_endian,
+                                          bits_to_target)
+from Blockchain.Backend.core.database.database import BlockchainDB
 
 class BlockHeader:
     def __init__(self, version, prevBlockHash, merkleRoot, timestamp, bits, nonce = None):
@@ -29,19 +33,59 @@ class BlockHeader:
         result += self.nonce
         return result
     
-    def mine(self, target):
+    def to_hex(self):
+        self.blockHash = self.generateBlockHash()
+        self.nonce = little_endian_to_int(self.nonce)
+        self.prevBlockHash = self.prevBlockHash.hex()
+        self.merkleRoot = self.merkleRoot.hex()
+        self.bits = self.bits.hex()
+
+    def to_bytes(self):
+        self.nonce = int_to_little_endian(self.nonce, 4)
+        self.prevBlockHash = bytes.fromhex(self.prevBlockHash)
+        self.merkleRoot = bytes.fromhex(self.merkleRoot)
+        self.blockHash = bytes.fromhex(self.blockHash)
+        self.bits = bytes.fromhex(self.bits)
+    
+    def mine(self, target, newBlockAvailable):
         self.blockHash = target + 1
+        newBlockAvailable = False
 
         while self.blockHash > target :
+            if newBlockAvailable:
+                competitionOver = True
+                return competitionOver
+            
             self.blockHash = little_endian_to_int(
                                     hash256(
                                         int_to_little_endian(self.version,4)
                                         + bytes.fromhex(self.prevBlockHash )[::-1]
-                                        + bytes.fromhex(self.merkleRoot)
+                                        + bytes.fromhex(self.merkleRoot)[::-1]
                                         + int_to_little_endian(self.timestamp,4)
                                         + self.bits 
                                         + int_to_little_endian(self.nonce,4)))
             self.nonce += 1
             print(f"채굴 시작 {self.nonce}", end = '\r')
         self.blockHash = int_to_little_endian(self.blockHash, 32).hex()[::-1]
+        self.nonce -= 1
         self.bits = self.bits.hex()
+    
+    def validateBlock(self):
+        lastBlock = BlockchainDB().lastBlock()
+        if self.prevBlockHash.hex() == lastBlock['BlockHeader']['blockHash']:
+            if self.check_pow():
+                return True
+            
+    def check_pow(self):
+        sha = hash256(self.serialize())
+        proof = little_endian_to_int(sha)
+        return proof < bits_to_target(self.bits)
+    
+    def generateBlockHash(self):
+        sha = hash256(self.serialize())
+        proof = little_endian_to_int(sha)
+        return int_to_little_endian(proof, 32).hex()[::-1]
+    
+    def to_dict(self):
+        dt = self.__dict__
+        return dt

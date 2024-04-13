@@ -36,6 +36,7 @@ class CoinbaseTx:
         return coinBaseTx
 
 class Tx:
+    command = b'Tx'
     def __init__(self, version, tx_ins, tx_outs, locktime):
         self.version = version
         self.tx_ins = tx_ins

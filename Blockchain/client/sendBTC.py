@@ -4,6 +4,7 @@ from Blockchain.Backend.core.Tx import TxIn, TxOut, Tx
 from Blockchain.Backend.core.database.database import AccountDB
 from Blockchain.Backend.core.EllepticCurve.EllepticCurve import PrivateKey
 import time
+import random
 
 class SendBTC:
     def __init__ (self, fromAccount, toAccount, Amount, UTXOS):
@@ -42,17 +43,19 @@ class SendBTC:
         except Exception as e:
             print("Error in converting the Managed Dict to Normal Dict")
 
-        for Txbyte in newutxos:
-            if self.Total < self.Amount:
-                TxObj = newutxos[Txbyte]
-            
-                for index, txout in enumerate(TxObj.tx_outs):
-                    if txout.script_pubkey.cmds[2] == self.fromPubKeyHAsh:
-                        self.Total += txout.amount
-                        prev_tx = bytes.fromhex(Txbyte)
-                        TxIns.append(TxIn(prev_tx, index))
-            else:
-                break
+        """ index 에 따라 random 하게 Tx을 읽어서 추가 """
+        for index, Txbyte in enumerate(newutxos):
+            if index > random.randint(1,30):
+                if self.Total < self.Amount:
+                    TxObj = newutxos[Txbyte]
+                
+                    for index, txout in enumerate(TxObj.tx_outs):
+                        if txout.script_pubkey.cmds[2] == self.fromPubKeyHAsh:
+                            self.Total += txout.amount
+                            prev_tx = bytes.fromhex(Txbyte)
+                            TxIns.append(TxIn(prev_tx, index))
+                else:
+                    break
 
         self.isBalanceEnough = True
         if self.Total < self.Amount:

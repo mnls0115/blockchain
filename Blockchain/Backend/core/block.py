@@ -58,3 +58,8 @@ class Block:
                    block,
                    len(Transactions),
                    Transactions)
+    
+    def to_dict(self):
+        dt = self.__dict__
+        self.BlockHeader = self.BlockHeader.to_dict()
+        return dt

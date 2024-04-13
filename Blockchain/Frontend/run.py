@@ -1,9 +1,11 @@
 from flask import Flask, render_template, request, redirect, url_for
 from Blockchain.client.sendBTC import SendBTC
 from Blockchain.Backend.core.Tx import Tx
-from Blockchain.Backend.core.database.database import BlockchainDB
+from Blockchain.Backend.core.database.database import BlockchainDB, NodeDB
 from Blockchain.Backend.util.util import encode_base58, decode_base58
+from Blockchain.Backend.core.network.syncManager import syncManager
 from hashlib import sha256
+from multiprocessing import Process
 from flask_qrcode import QRcode
 
 app = Flask(__name__)
@@ -193,8 +195,6 @@ def address(publicAddress):
 def wallet():
     message = ''
 
-    print('1')
-
     if request.method == "POST":
         FromAddress = request.form.get("fromAddress")
         ToAddress = request.form.get("toAddress")
@@ -205,37 +205,50 @@ def wallet():
                 UTXOS=UTXOS)
         TxObj = sendCoin.prepareTransaction()
         
-        print('2')
-
         scriptPubKey = sendCoin.scriptPubKey(FromAddress)
         verified = True
 
-        
         if not TxObj:
             message = "Invalid Trasaction"
-            print('3')
 
         if isinstance(TxObj, Tx):
             for index, tx in enumerate(TxObj.tx_ins):
                 if not TxObj.verify_input(input_index=index, script_pubkey=scriptPubKey):
                     verified = False
-                print('4')
-            
-            print('5')
             
             if verified:
                 MEMPOOL[TxObj.TxId] = TxObj
+                relayTxs = Process(target = broadcastTx, args = (TxObj, localHostPort))
+                relayTxs.start()
                 message = "Transaction added in Memory Pool"
-                print('6')
 
-    print('7')
     return render_template('wallet.html', message = message)
 
-def main(utxos, MemPool, port):
+def broadcastTx(TxObj, localHostPort = None):
+    try:
+        node = NodeDB()
+        portList = node.read()
+
+        for port in portList:
+            if localHostPort != port:
+                sync = syncManager(host = '127.0.0.1',
+                                    port = port)
+                try:
+                    sync.connectToHost(localport = localHostPort-1,
+                                       port = port)
+                    sync.publishTx(TxObj)
+
+                except Exception as e:
+                    pass
+
+    except Exception as e:
+        pass
+
+def main(utxos, MemPool, port, localPort):
     global UTXOS
     global MEMPOOL
-
+    global localHostPort
     UTXOS = utxos
     MEMPOOL = MemPool
-
+    localHostPort = localPort
     app.run(port = port)
